@@ -301,6 +301,7 @@ class System {
   void CallProgram(int command) {
     // 執行任務一
     if (command == 1) {
+      std::cout << "\n";
       // 確認讀檔是否順利，不順利則跳離
       if (!program_package.ReadBinFile()) {
         return;
