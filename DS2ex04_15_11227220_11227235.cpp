@@ -17,16 +17,18 @@ struct ListType {
   float weight;            // 量化權重
 };
 
-struct ListTypeConnect {
-  std::string receive_id;  // 收訊者學號
-  int connect;             // 連通多少節點
-};
-
 // 頂點中的資料型態
 struct VertexType {
   std::string send_id;                  // 發訊者學號
   std::vector<ListType> adjacent_list;  // 互動關係的陣列
 };
+
+struct VertexTypeConnect {
+  std::string send_id;                  // 發訊者學號
+  std::vector<ListType> adjacent_list;  // 互動關係的陣列
+  int connect;             // 連通多少節點
+};   
+
 // 哈希表的資料型態
 struct HashType {
   std::vector<VertexType> vertex_list;
@@ -70,14 +72,14 @@ class Hash {
     }
   }
   // 這個函式是要用來找到發送者學號在列表中位置並更新它的Adjacent_List
-  void UpdateVertexAdjacentList(std::string send_id, ListType new_list) {
-    int index = CalculateHashValue(send_id);
+  int UpdateVertexAdjacentList(std::string send_id, ListType new_list, int& index) {
+    index = CalculateHashValue(send_id);
     if (list[index].vertex_list.empty()) {
       VertexType vertex;
       vertex.send_id = send_id;
       vertex.adjacent_list.push_back(new_list);
       list[index].vertex_list.push_back(vertex);
-      return;
+      return 0;
     } else {
       // 這個For迴圈用意是尋找輸入ID是否已經存入過hash中
       for (int n = 0; n < list[index].vertex_list.size(); n++) {
@@ -86,19 +88,30 @@ class Hash {
           for (int i = 0; i < list[index].vertex_list[n].adjacent_list.size(); i++) {
             if (new_list.receive_id < list[index].vertex_list[n].adjacent_list[i].receive_id) {
               list[index].vertex_list[n].adjacent_list.insert( list[index].vertex_list[n].adjacent_list.begin() + i, new_list);
-              return;
+              return n;
             }
           }
           list[index].vertex_list[n].adjacent_list.push_back(new_list);
-          return;
+          return n;
         }
       }
       VertexType vertex;
       vertex.send_id = send_id;
       vertex.adjacent_list.push_back(new_list);
       list[index].vertex_list.push_back(vertex);
-      return;
+      return list[index].vertex_list.size() - 1;
     }
+  }
+  // 這個函式是在已發送者學號在列表中的位置情況下可以直接找到並更新它的Adjacent_List
+  void UpdateVertexAdjacentList(int index, int list_position, ListType new_list) {
+    for (int i = 0; i < list[index].vertex_list[list_position].adjacent_list.size(); i++) {
+      if (new_list.receive_id < list[index].vertex_list[list_position].adjacent_list[i].receive_id) {
+        list[index].vertex_list[list_position].adjacent_list.insert( list[index].vertex_list[list_position].adjacent_list.begin() + i, new_list);
+        return;
+      }
+    }
+    list[index].vertex_list[list_position].adjacent_list.push_back(new_list);
+    return;
   }
 };
 // 設計相鄰串列的一些功能
@@ -138,12 +151,14 @@ class AdjacencyLists {
 
 class ConnectionCounts {
  public:
-  std::vector<VertexType> list;
+  std::vector<VertexTypeConnect> list;
  public:
  // 算連通數
-
+ 
  // 接到對應的地方(選擇排序)
-}
+
+ // 寫檔
+};
 
 class ProgramPackage {
   // 限class內部可讀寫的變數
@@ -217,13 +232,21 @@ class ProgramPackage {
 
   void BuildAdjacencyLists() {
     Hash hash;
+    std::string previous_send_id = "";
+    int previos_index = 0;
+    int previos_list_position = 0;
     adj_list.list.clear();
     for (DataType data : dataset) {
       ListType new_list;
       new_list.receive_id = std::string(data.receive_id.data());
       new_list.weight = data.weight;
       hash.CheckReceiveIDIsExist(new_list.receive_id);
-      hash.UpdateVertexAdjacentList(std::string(data.send_id.data()), new_list);
+      if (previous_send_id == std::string(data.send_id.data())) {
+        hash.UpdateVertexAdjacentList(previos_index, previos_list_position, new_list);
+      } else {
+        previous_send_id = std::string(data.send_id.data());
+        previos_list_position = hash.UpdateVertexAdjacentList(std::string(data.send_id.data()), new_list, previos_index);
+      }
     }
     adj_list.BuildList(hash);
     WriteAdjFile();
