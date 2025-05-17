@@ -9,6 +9,8 @@
 #include <map>
 #include <queue>
 #include <set>
+
+#define HASH_SIZE 250
 // Bin檔中的資料型態
 struct DataType {
   std::array<char, 12> send_id{};     // 發訊者學號
@@ -27,11 +29,10 @@ class Hash {
   // 外部可讀寫的變數
  public:
   std::vector<HashType> list;
-  int hash_size = 250;
   // 外部可使用的函式
  public:
   Hash() {
-    list.resize(hash_size);
+    list.resize(HASH_SIZE);
   }
   // 計算索引值
   int CalculateHashValue(std::string id) {
@@ -43,7 +44,7 @@ class Hash {
         break;
       }
       index *= id[i];
-      index %= hash_size;
+      index %= HASH_SIZE;
 
       i += 1;
     }
@@ -98,7 +99,7 @@ class AdjacencyLists {
  // 外部可使用的函式
  public:
   void BuildList(Hash hash) {
-    for (int index = 0; index < 109; index++) {
+    for (int index = 0; index < HASH_SIZE; index++) {
       // 如果索引值對應的頂點陣列內沒有值，直接執行下一個索引值的檢索
       if (hash.list[index].vertex_list.empty()) {
         continue;
