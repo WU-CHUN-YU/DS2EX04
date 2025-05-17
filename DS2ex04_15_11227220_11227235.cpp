@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 #include <map>
-
+#include <queue>
+#include <set>
 // Bin檔中的資料型態
 struct DataType {
   std::array<char, 12> send_id{};     // 發訊者學號
@@ -77,25 +78,66 @@ class Hash {
     return;
   }
 };
+
 // 設計相鄰串列的一些功能
 class AdjacencyLists {
  // 外部可讀寫的變數
  public:
   // key為發送者訊號，Value為相鄰點的Map
-  std::map<std::string, std::map<std::string, float>> list; //主陣列
+  std::map<std::string, std::map<std::string, float>> list; // 主陣列
+  std::map<int, std::map<std::string, std::set<std::string>>> connectionlist; // 連通點陣列
  // 外部可使用的函式
  public:
   void BuildList(Hash hash) {
     for (int index = 0; index < 109; index++) {
-      //如果索引值對應的頂點陣列內沒有值，直接執行下一個索引值的檢索
+      // 如果索引值對應的頂點陣列內沒有值，直接執行下一個索引值的檢索
       if (hash.list[index].vertex_list.empty()) {
         continue;
       }
-      //如果索引值對應的頂點陣列內有值，新增到清單中
+      // 如果索引值對應的頂點陣列內有值，新增到清單中
       for (std::pair<std::string, std::map<std::string, float>> data : hash.list[index].vertex_list) {
           list.insert(data);
       }
     }
+  }
+  int CalculateConnectionNumber() {
+    std::queue<std::string> recipient; //收訊者
+    std::map<std::string, std::map<std::string, float>>::iterator new_sender;
+    std::set<std::string>::iterator exist;
+    std::map<int, std::map<std::string, std::set<std::string>>>::iterator check;
+    std::set<std::string> connection_vertex;
+    int total = 0;
+    // 每個ID做一次
+    for (std::pair<std::string, std::map<std::string, float>> position : list) {
+      connection_vertex.clear();
+      for (std::pair<std::string, float> data : position.second) {
+        connection_vertex.insert(data.first);
+        recipient.push(data.first);
+      }
+      while (!recipient.empty()) {
+        // 加入當前層符合條件的收訊者
+        new_sender = list.find(recipient.front());
+        for (std::pair<std::string, float> data : new_sender -> second) {
+          exist = connection_vertex.find(data.first);
+          // 如果位置等於.end()，代表沒找到
+          // map.end()是一個虛擬的位置，不指向任何有效元素，只是用來表示「已超出範圍」
+          if (exist == connection_vertex.end() && data.first != position.first) {
+            recipient.push(data.first);
+            connection_vertex.insert(data.first);
+          }
+        }
+        recipient.pop();
+      }
+      check = connectionlist.find(connection_vertex.size());
+      if (check == connectionlist.end()) {
+        std::pair<std::string, std::set<std::string>> result(position.first, connection_vertex);
+        connectionlist.insert(std::pair<int, std::map<std::string, std::set<std::string>>>(connection_vertex.size(), {result}));
+      } else {
+        check -> second.insert(std::pair<std::string, std::set<std::string>>(position.first, connection_vertex));
+      }
+      total++;
+    }
+    return total;
   }
 };
 
@@ -112,6 +154,7 @@ class ProgramPackage {
  public:
   // 讀取指定Bin檔中的資料
   bool ReadBinFile() {
+    doneMissionOne = false;
     std::ifstream file;
     std::string file_name, file_line;
     // 列印輸入提示及讀取檔案編號
@@ -160,7 +203,7 @@ class ProgramPackage {
       int receive_count = 1;
       for (std::pair<std::string, float> data : position.second) {
         file << "\t" << "(" << std::setw(2) << receive_count << ") " << data.first << ",   " << std::setw(4) << data.second;
-        if (receive_count == 12) {
+        if (receive_count % 12 == 0) {
           file << "\n";
         }
         receive_count++;
@@ -173,7 +216,35 @@ class ProgramPackage {
     file.close();
     return;
   }
-
+    // 寫入.cnt檔
+  void WriteCntFile(int total_count) {
+    std::ofstream file;
+    // 組合完整檔名
+    std::string file_name = "pairs" + file_number + ".cnt";
+    int count = 0;
+    //  開啟檔案
+    file.open(file_name);
+    file << "<<< There are " << total_count << " IDs in total. >>>";
+    for (auto position = adj_list.connectionlist.rbegin(); position != adj_list.connectionlist.rend(); position++) {
+      for (std::pair<std::string, std::set<std::string>> data : position -> second) {
+        file << "\n" << "[" << std::setw(3) << count + 1 << "] " << data.first << "(" << position -> first << ")" << ": " << "\n";
+        int connection_count = 1;
+        for (std::string connection : data.second) {
+          file << "\t" << "(" << std::setw(2) << connection_count << ") " << connection;
+          if (connection_count % 12 == 0) {
+            file << "\n";
+          }
+          connection_count++;
+        }
+        count++;
+      }
+    }
+    file << "\n";
+    //  關閉檔案
+    file.close();
+    return;
+  }
+  // 建立相鄰串列
   void BuildAdjacencyLists() {
     Hash hash;
     std::string previous_send_id = "";
@@ -207,7 +278,12 @@ class ProgramPackage {
     return;
   }
   void ComputeConnectionCounts() {
+    int total_id = 0;
+    adj_list.connectionlist.clear();
     // new_list;
+    total_id = adj_list.CalculateConnectionNumber();
+    WriteCntFile(total_id);
+    std::cout << "\n" << "<<< There are " << total_id << " IDs in total. >>>" << "\n\n";
   }
 };
 
@@ -260,6 +336,7 @@ class System {
     } else if (command == 2) {  // 執行任務二
       if (program_package.doneMissionOne == false) {
         std::cout << "### There is no graph and choose 1 first. ###" << "\n\n";
+        return;
       }
       program_package.ComputeConnectionCounts();
     }
