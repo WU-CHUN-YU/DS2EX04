@@ -27,16 +27,25 @@ class Hash {
   // 外部可讀寫的變數
  public:
   std::vector<HashType> list;
+  int hash_size = 250;
   // 外部可使用的函式
  public:
   Hash() {
-    list.resize(109);  // 設109原因是計算索引值公式為發訊者學號每位數相加，12 * 9 + 1 = 109
+    list.resize(hash_size);
   }
   // 計算索引值
   int CalculateHashValue(std::string id) {
-    int index = 0;
-    for (int i = 0; i < 12 && id[i] != '\0'; i++) {
-      index += id[i] - '0';
+    int index = 1;
+
+    int i = 0;
+    while (true) {
+      if (i == id.size()-1 || id[i] == '\0') {
+        break;
+      }
+      index *= id[i];
+      index %= hash_size;
+
+      i += 1;
     }
     return index;
   }
