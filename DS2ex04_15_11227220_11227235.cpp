@@ -10,7 +10,7 @@
 #include <queue>
 #include <set>
 
-#define HASH_SIZE 250
+#define HASH_SIZE 100
 // Bin檔中的資料型態
 struct DataType {
   std::array<char, 12> send_id{};     // 發訊者學號
