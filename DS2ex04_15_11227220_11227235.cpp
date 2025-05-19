@@ -9,8 +9,7 @@
 #include <map>
 #include <queue>
 #include <set>
-
-#define HASH_SIZE 100
+#include <unordered_map>
 // Bin檔中的資料型態
 struct DataType {
   std::array<char, 12> send_id{};     // 發訊者學號
@@ -32,21 +31,13 @@ class Hash {
   // 外部可使用的函式
  public:
   Hash() {
-    list.resize(HASH_SIZE);
+    list.resize(109);  // 設109原因是計算索引值公式為發訊者學號每位數相加，12 * 9 + 1 = 109
   }
   // 計算索引值
   int CalculateHashValue(std::string id) {
-    int index = 1;
-
-    int i = 0;
-    while (true) {
-      if (i == id.size()-1 || id[i] == '\0') {
-        break;
-      }
-      index *= id[i];
-      index %= HASH_SIZE;
-
-      i += 1;
+    int index = 0;
+    for (int i = 0; i < 12 && id[i] != '\0'; i++) {
+      index += id[i] - '0';
     }
     return index;
   }
@@ -99,7 +90,7 @@ class AdjacencyLists {
  // 外部可使用的函式
  public:
   void BuildList(Hash hash) {
-    for (int index = 0; index < HASH_SIZE; index++) {
+    for (int index = 0; index < 109; index++) {
       // 如果索引值對應的頂點陣列內沒有值，直接執行下一個索引值的檢索
       if (hash.list[index].vertex_list.empty()) {
         continue;
@@ -111,43 +102,63 @@ class AdjacencyLists {
     }
   }
   int CalculateConnectionNumber() {
-    std::queue<std::string> recipient; //收訊者
-    std::map<std::string, std::map<std::string, float>>::iterator new_sender;
-    std::set<std::string>::iterator exist;
-    std::map<int, std::map<std::string, std::set<std::string>>>::iterator check;
-    std::set<std::string> connection_vertex;
-    int total = 0;
-    // 每個ID做一次
-    for (std::pair<std::string, std::map<std::string, float>> position : list) {
-      connection_vertex.clear();
-      for (std::pair<std::string, float> data : position.second) {
-        connection_vertex.insert(data.first);
-        recipient.push(data.first);
-      }
-      while (!recipient.empty()) {
-        // 加入當前層符合條件的收訊者
-        new_sender = list.find(recipient.front());
-        for (std::pair<std::string, float> data : new_sender -> second) {
-          exist = connection_vertex.find(data.first);
-          // 如果位置等於.end()，代表沒找到
-          // map.end()是一個虛擬的位置，不指向任何有效元素，只是用來表示「已超出範圍」
-          if (exist == connection_vertex.end() && data.first != position.first) {
-            recipient.push(data.first);
-            connection_vertex.insert(data.first);
+    // 已完成的檢索表
+    std::unordered_map<std::string, std::set<std::string>> visited;
+    std::unordered_map<std::string, std::set<std::string>>::iterator position;
+    std::map<std::string, std::set<std::string>> temp;
+    // 接收者佇列
+    std::queue<std::string> recipient;
+    // 連接點列表
+    std::set<std::string> junction;
+    std::string vertex;
+    int total_id = 0;
+    // 以每個發訊者學號為Root來做一遍
+    for (const auto& root : list) {
+      recipient.push(root.first);
+      while(!recipient.empty()) {
+        // 取得最佇列最前面的學號
+        vertex = recipient.front();
+        recipient.pop();
+        // // 如果vertex已經在junction裡面，直接pop掉
+        // if (junction.count(vertex) == 1) {
+        //   continue;
+        // }
+        // 查找vertex在不在visited裡面
+        position = visited.find(vertex);
+        // 代表曾經已經算過了
+        if (position != visited.end()) {
+          junction.emplace(vertex);
+          for(const auto& connection_vertex : position -> second) {
+            if (junction.count(connection_vertex) == 1 || connection_vertex == root.first) {
+              continue;
+            } else {
+              junction.emplace(connection_vertex);
+            }
+          }
+        } else { // 代表還沒算過
+          for (const auto& new_recipient : list[vertex]) {
+            if (junction.count(new_recipient.first) == 1 || new_recipient.first == root.first) {
+              continue;
+            }
+            recipient.push(new_recipient.first);
+            junction.emplace(new_recipient.first);
           }
         }
-        recipient.pop();
       }
-      check = connectionlist.find(connection_vertex.size());
-      if (check == connectionlist.end()) {
-        std::pair<std::string, std::set<std::string>> result(position.first, connection_vertex);
-        connectionlist.insert(std::pair<int, std::map<std::string, std::set<std::string>>>(connection_vertex.size(), {result}));
-      } else {
-        check -> second.insert(std::pair<std::string, std::set<std::string>>(position.first, connection_vertex));
-      }
-      total++;
+      visited[root.first] = junction;
+      junction.clear();
+      total_id++;
     }
-    return total;
+    for (const auto& data : visited) {
+      if (connectionlist.count(data.second.size()) == 0) {
+        temp.insert(std::pair<std::string, std::set<std::string>>(data.first, data.second));
+        connectionlist.insert(std::pair<int, std::map<std::string, std::set<std::string>>>(data.second.size(), {temp}));
+        temp.clear();
+      } else {
+        connectionlist[data.second.size()].insert(std::pair<std::string, std::set<std::string>>(data.first, data.second));
+      }
+    }
+    return total_id;
   }
 };
 
