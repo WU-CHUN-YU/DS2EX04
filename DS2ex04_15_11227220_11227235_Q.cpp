@@ -409,6 +409,7 @@ class ProgramPackage {
   void EstimateInfluenceValues() {
     std::string real_string;
     float real_number = 0.0;
+    adj_list.influencelist.clear();
     while (true) {
       std::cout << "\n" << "Input a real number in [0,1]: ";
       std::cin >> real_string;
